@@ -21,4 +21,7 @@ server/node_modules/
 server/.env
 server/storage/
 
-rzp.md
+# Keep internal Markdown documentation local. The public project README remains
+# tracked as the repository's landing page.
+*.md
+!/README.md
