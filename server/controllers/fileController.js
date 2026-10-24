@@ -16,12 +16,6 @@ import {
   UPLOAD_LIFETIME_MS,
 } from "../services/storageService.js";
 
-function validateFileId(id) {
-  if (typeof id !== "string" || !mongoose.isObjectIdOrHexString(id)) {
-    throw storageError(400, "A valid fileId is required");
-  }
-}
-
 async function findFile(id, userId, session) {
   const file = await File.findOne({ _id: id, userId }).session(session);
   if (!file) throw storageError(404, "File not found");
@@ -56,7 +50,7 @@ export const getFile = async (req, res, next) => {
 export const renameFile = async (req, res, next) => {
   try {
     const file = await findFile(req.params.id, req.user._id, null);
-    file.name = req.body.newFilename;
+    file.name = req.validated.body.newFilename;
     file.updatedAt = new Date();
     await file.save();
     return res.json({ message: "Renamed" });
@@ -67,26 +61,19 @@ export const renameFile = async (req, res, next) => {
 
 export const uploadInitiate = async (req, res, next) => {
   try {
-    const size = Number(req.body.size);
-    if (
-      !["number", "string"].includes(typeof req.body.size) ||
-      String(req.body.size).trim() === "" ||
-      !Number.isSafeInteger(size) ||
-      size < 0
-    ) {
-      throw storageError(400, "Invalid file size");
-    }
-    const name = req.body.name || "untitled";
-    if (typeof name !== "string") throw storageError(400, "Invalid filename");
-    const parentDirId = req.body.parentDirId || req.user.rootDirId;
-    if (!mongoose.isObjectIdOrHexString(parentDirId))
-      throw storageError(400, "Invalid parent directory");
+    const {
+      name,
+      size,
+      contentType,
+      parentDirId: requestedParentDirId,
+    } = req.validated.body;
+    const parentDirId = requestedParentDirId || req.user.rootDirId;
     const fileId = new mongoose.Types.ObjectId();
     const extension = path.extname(name);
     // Signing has no remote side effect. Only expose the URL after reservation.
     const uploadUrl = await createSignedUploadUrl({
       Key: `${fileId}${extension}`,
-      ContentType: req.body.contentType,
+      ContentType: contentType,
       ContentLength: size,
     });
     await withStorageTransaction(req.user._id, async ({ user, session }) => {
@@ -115,8 +102,7 @@ export const uploadInitiate = async (req, res, next) => {
 
 export const uploadComplete = async (req, res, next) => {
   try {
-    const { fileId } = req.body;
-    validateFileId(fileId);
+    const { fileId } = req.validated.body;
     const initial = await findFile(fileId, req.user._id, null);
     if (initial.uploadCompletedAt)
       return res.json({ message: "Upload Complete" });
@@ -178,8 +164,7 @@ export const uploadComplete = async (req, res, next) => {
 
 export const uploadCancel = async (req, res, next) => {
   try {
-    const { fileId } = req.body;
-    validateFileId(fileId);
+    const { fileId } = req.validated.body;
     await withStorageTransaction(req.user._id, async ({ user, session }) => {
       const file = await File.findOne({
         _id: fileId,

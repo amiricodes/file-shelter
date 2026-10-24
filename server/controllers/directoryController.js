@@ -11,15 +11,7 @@ import {
   reconcileSizes,
   storageError,
 } from "../services/storageService.js";
-import {
-  buildCursorMatch,
-  decodeCursor,
-  encodeCursor,
-  InvalidCursorError,
-} from "../utils/paginationCursor.js";
-
-const DEFAULT_PAGE_SIZE = 100;
-const MAX_PAGE_SIZE = 100;
+import { buildCursorMatch, encodeCursor } from "../utils/paginationCursor.js";
 
 function rejectRootMutation(req, res) {
   if (String(req.params.id) !== String(req.user.rootDirId)) return false;
@@ -53,23 +45,7 @@ async function buildLegacyPathIds(directoryData, userId) {
 export const getDirectory = async (req, res) => {
   const { rootDirId } = req.user;
   const id = req.params.id || rootDirId;
-  const requestedLimit = Number.parseInt(req.query.limit, 10);
-  const limit = Math.min(
-    Math.max(
-      Number.isFinite(requestedLimit) ? requestedLimit : DEFAULT_PAGE_SIZE,
-      1,
-    ),
-    MAX_PAGE_SIZE,
-  );
-  let cursor;
-  try {
-    cursor = decodeCursor(req.query.cursor);
-  } catch (error) {
-    if (error instanceof InvalidCursorError) {
-      return res.status(error.status).json({ error: error.message });
-    }
-    throw error;
-  }
+  const { limit, cursor } = req.validated.query;
 
   const directoryData = await Directory.findOne({
     _id: id,
@@ -175,6 +151,7 @@ export const getDirectory = async (req, res) => {
 export const createDirectory = async (req, res, next) => {
   try {
     const parentDirId = req.params.parentDirId || req.user.rootDirId;
+    const { dirname } = req.validated.directory;
     await withStorageTransaction(req.user._id, async ({ user, session }) => {
       const ancestors = await liveAncestors(parentDirId, user._id, session);
       const newDirId = new ObjectId();
@@ -182,7 +159,7 @@ export const createDirectory = async (req, res, next) => {
         [
           {
             _id: newDirId,
-            name: req.headers.dirname || "New Folder",
+            name: dirname,
             parentDirId,
             path: [...ancestors.map((dir) => dir._id).reverse(), newDirId],
             userId: user._id,
@@ -202,7 +179,7 @@ export const createDirectory = async (req, res, next) => {
 export const renameDirectory = async (req, res, next) => {
   const user = req.user;
   const { id } = req.params;
-  const { newDirName } = req.body;
+  const { newDirName } = req.validated.body;
 
   if (rejectRootMutation(req, res)) return;
 

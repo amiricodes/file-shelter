@@ -209,6 +209,124 @@ describe("file upload lifecycle", () => {
   });
 });
 
+describe("file and directory request validation", () => {
+  it("rejects invalid upload fields and unknown properties consistently", async () => {
+    const account = await createAccount();
+    const invalidBodies = [
+      { name: "", size: 1 },
+      { name: "x".repeat(256), size: 1 },
+      { name: "negative.bin", size: -1 },
+      { name: "fractional.bin", size: 1.5 },
+      { name: "extra.bin", size: 1, unexpected: true },
+      { name: "bad-parent.bin", size: 1, parentDirId: "not-an-id" },
+    ];
+
+    for (const body of invalidBodies) {
+      const response = await request(app)
+        .post("/file/upload/initiate")
+        .set("Cookie", account.cookie)
+        .send(body);
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toEqual(expect.any(Object));
+    }
+
+    expect(await File.countDocuments()).toBe(0);
+  });
+
+  it("rejects malformed upload IDs, rename bodies, and directory names", async () => {
+    const account = await createAccount();
+
+    for (const [method, url, body] of [
+      ["post", "/file/upload/complete", { fileId: "invalid" }],
+      ["delete", "/file/upload/cancel", { fileId: "invalid" }],
+      ["patch", `/file/${new Types.ObjectId()}`, { newFilename: "" }],
+      [
+        "patch",
+        `/directory/${new Types.ObjectId()}`,
+        { newDirName: "x".repeat(256) },
+      ],
+    ]) {
+      const response = await request(app)
+        [method](url)
+        .set("Cookie", account.cookie)
+        .send(body);
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toEqual(expect.any(Object));
+    }
+
+    const emptyDirectory = await request(app)
+      .post("/directory")
+      .set("Cookie", account.cookie)
+      .set("dirname", "   ");
+    expect(emptyDirectory.status).toBe(400);
+    expect(emptyDirectory.body.error.dirname).toBeDefined();
+
+    const directoryWithUnknownField = await request(app)
+      .post("/directory")
+      .set("Cookie", account.cookie)
+      .send({ unexpected: true });
+    expect(directoryWithUnknownField.status).toBe(400);
+    expect(directoryWithUnknownField.body.error._errors).toBeDefined();
+  });
+
+  it("rejects invalid directory pagination instead of clamping or restarting", async () => {
+    const account = await createAccount();
+    const malformedCursor = Buffer.from(
+      JSON.stringify({ updatedAt: "not-a-date", id: new Types.ObjectId() }),
+    ).toString("base64url");
+
+    for (const query of [
+      "limit=0",
+      "limit=101",
+      "limit=1.5",
+      "limit=abc",
+      `cursor=${malformedCursor}`,
+      "cursor=not+a+cursor",
+      "unexpected=true",
+    ]) {
+      const response = await request(app)
+        .get(`/directory?${query}`)
+        .set("Cookie", account.cookie);
+
+      expect(response.status).toBe(400);
+      expect(response.body.error).toEqual(expect.any(Object));
+    }
+  });
+
+  it("accepts important name, size, and pagination boundary values", async () => {
+    const account = await createAccount();
+    const boundaryName = "x".repeat(255);
+
+    const upload = await request(app)
+      .post("/file/upload/initiate")
+      .set("Cookie", account.cookie)
+      .send({ name: boundaryName, size: 0 });
+    expect(upload.status).toBe(201);
+    expect((await File.findById(upload.body.fileId)).name).toBe(boundaryName);
+
+    const createdDirectory = await request(app)
+      .post("/directory")
+      .set("Cookie", account.cookie)
+      .set("dirname", boundaryName);
+    expect(createdDirectory.status).toBe(200);
+    expect(
+      await Directory.countDocuments({
+        userId: account.user._id,
+        name: boundaryName,
+      }),
+    ).toBe(1);
+
+    for (const limit of [1, 100]) {
+      const listing = await request(app)
+        .get(`/directory?limit=${limit}`)
+        .set("Cookie", account.cookie);
+      expect(listing.status).toBe(200);
+    }
+  });
+});
+
 describe("recursive directory lifecycle", () => {
   it("trashes and restores a nested subtree while preserving quota totals", async () => {
     const account = await createAccount();
