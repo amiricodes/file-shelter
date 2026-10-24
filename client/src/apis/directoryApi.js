@@ -1,21 +1,6 @@
-const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URI;
+import { parseApiResponse } from "./apiResponse";
 
-/**
- * Utility: handle fetch errors
- */
-async function handleFetchErrors(response) {
-  if (!response.ok) {
-    let errMsg = `Request failed with status ${response.status}`;
-    try {
-      const data = await response.json();
-      if (data.error) errMsg = data.error;
-    } catch {
-      // If JSON parsing fails, default errMsg stays
-    }
-    throw new Error(errMsg);
-  }
-  return response;
-}
+const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URI;
 
 /**
  * Fetch directory contents and items
@@ -32,14 +17,7 @@ export async function getDirectoryItems(
     signal,
   });
 
-  if (response.status === 401) {
-    throw new Error("Unauthorized");
-  }
-
-  await handleFetchErrors(response);
-  const data = await response.json();
-
-  return data;
+  return parseApiResponse(response);
 }
 
 /**
@@ -54,10 +32,7 @@ export async function createDirectory(dirId, dirName) {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  const data = await response.json();
-
-  return data;
+  return parseApiResponse(response);
 }
 
 /**
@@ -73,10 +48,7 @@ export async function renameDirectory(id, newDirName) {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  const data = await response.json();
-
-  return data;
+  return parseApiResponse(response);
 }
 
 /**
@@ -88,8 +60,5 @@ export async function deleteDirectory(id) {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  const data = await response.json();
-
-  return data;
+  return parseApiResponse(response);
 }

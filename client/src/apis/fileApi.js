@@ -1,23 +1,6 @@
-const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URI;
+import { parseApiResponse } from "./apiResponse";
 
-/**
- * Utility: handle fetch errors
- */
-async function handleFetchErrors(response) {
-  if (!response.ok) {
-    let errMsg = `Request failed with status ${response.status}`;
-    try {
-      const data = await response.json();
-      if (data.error) errMsg = data.error;
-    } catch {
-      // If JSON parsing fails, default errMsg stays
-    }
-    const error = new Error(response.status === 401 ? "Unauthorized" : errMsg);
-    error.status = response.status;
-    throw error;
-  }
-  return response;
-}
+const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URI;
 
 /**
  * Delete a file
@@ -28,10 +11,7 @@ export async function deleteFile(id) {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  const data = await response.json();
-
-  return data;
+  return parseApiResponse(response);
 }
 
 /**
@@ -47,10 +27,7 @@ export async function renameFile(id, newFilename) {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  const data = await response.json();
-
-  return data;
+  return parseApiResponse(response);
 }
 
 /**
@@ -67,10 +44,7 @@ export async function uploadInitiate(file) {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  const data = await response.json();
-
-  return data;
+  return parseApiResponse(response);
 }
 
 export async function uploadComplete(fileId) {
@@ -83,10 +57,7 @@ export async function uploadComplete(fileId) {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  const data = await response.json();
-
-  return data;
+  return parseApiResponse(response);
 }
 
 export async function uploadCancel(fileId) {
@@ -99,8 +70,5 @@ export async function uploadCancel(fileId) {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  const data = await response.json();
-
-  return data;
+  return parseApiResponse(response);
 }
