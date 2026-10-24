@@ -1,18 +1,6 @@
-const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URI;
+import { parseApiResponse } from "./apiResponse";
 
-async function handleFetchErrors(response) {
-  if (!response.ok) {
-    let errMsg = `Request failed with status ${response.status}`;
-    try {
-      const data = await response.json();
-      if (data.error) errMsg = data.error;
-    } catch {
-      // If JSON parsing fails, default errMsg stays
-    }
-    throw new Error(errMsg);
-  }
-  return response;
-}
+const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URI;
 
 /**
  * Get or create the share link for a file/directory.
@@ -27,8 +15,7 @@ export async function createShare(resourceType, resourceId) {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  const data = await response.json();
+  const data = await parseApiResponse(response);
 
   return data.share;
 }
@@ -46,8 +33,7 @@ export async function updateShare(shareId, settings) {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  const data = await response.json();
+  const data = await parseApiResponse(response);
 
   return data.share;
 }
@@ -61,10 +47,7 @@ export async function revokeShare(shareId) {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  const data = await response.json();
-
-  return data;
+  return parseApiResponse(response);
 }
 
 /**
@@ -83,21 +66,5 @@ export async function getSharedItem(token, { dir, cursor, limit } = {}) {
     { credentials: "include" },
   );
 
-  if (!response.ok) {
-    let errMsg = `Request failed with status ${response.status}`;
-    let code = null;
-    try {
-      const data = await response.json();
-      if (data.error) errMsg = data.error;
-      if (data.code) code = data.code;
-    } catch {
-      // If JSON parsing fails, defaults stay
-    }
-    const error = new Error(errMsg);
-    error.status = response.status;
-    error.code = code;
-    throw error;
-  }
-
-  return response.json();
+  return parseApiResponse(response);
 }

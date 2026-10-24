@@ -40,7 +40,21 @@ export async function parseApiResponse(response, fallback) {
   }
 
   if (!response.ok) {
-    throw new Error(getErrorMessage(payload, fallback));
+    const message =
+      response.status === 401
+        ? "Unauthorized"
+        : getErrorMessage(
+            payload,
+            fallback ?? `Request failed with status ${response.status}`,
+          );
+    const error = new Error(message);
+    error.status = response.status;
+
+    if (payload?.code !== undefined) {
+      error.code = payload.code;
+    }
+
+    throw error;
   }
 
   return payload;

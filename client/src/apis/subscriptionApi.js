@@ -1,25 +1,6 @@
-const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URI;
+import { parseApiResponse } from "./apiResponse";
 
-/**
- * Utility: handle fetch errors
- */
-async function handleFetchErrors(response) {
-  if (!response.ok) {
-    let errMsg = `Request failed with status ${response.status}`;
-    let code = null;
-    try {
-      const data = await response.json();
-      if (data.error) errMsg = data.error;
-      if (data.code) code = data.code;
-    } catch {
-      // If JSON parsing fails, default errMsg stays
-    }
-    const err = new Error(errMsg);
-    if (code) err.code = code;
-    throw err;
-  }
-  return response;
-}
+const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URI;
 
 export const createSubscription = async (planId) => {
   const response = await fetch(`${BASE_URL}/subscriptions/create`, {
@@ -31,8 +12,7 @@ export const createSubscription = async (planId) => {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  return response.json();
+  return parseApiResponse(response);
 };
 
 export const getMySubscription = async () => {
@@ -40,8 +20,7 @@ export const getMySubscription = async () => {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  return response.json();
+  return parseApiResponse(response);
 };
 
 export const getMySubscriptionBillingDetails = async () => {
@@ -49,8 +28,7 @@ export const getMySubscriptionBillingDetails = async () => {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  return response.json();
+  return parseApiResponse(response);
 };
 
 export const upgradeSubscription = async (planId) => {
@@ -63,8 +41,7 @@ export const upgradeSubscription = async (planId) => {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  return response.json();
+  return parseApiResponse(response);
 };
 
 export const pauseSubscription = async () => {
@@ -73,8 +50,7 @@ export const pauseSubscription = async () => {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  return response.json();
+  return parseApiResponse(response);
 };
 
 export const resumeSubscription = async () => {
@@ -83,8 +59,7 @@ export const resumeSubscription = async () => {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  return response.json();
+  return parseApiResponse(response);
 };
 
 export const cancelSubscription = async ({ cancelAtCycleEnd = true } = {}) => {
@@ -97,6 +72,5 @@ export const cancelSubscription = async ({ cancelAtCycleEnd = true } = {}) => {
     credentials: "include",
   });
 
-  await handleFetchErrors(response);
-  return response.json();
+  return parseApiResponse(response);
 };

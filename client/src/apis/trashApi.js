@@ -1,25 +1,11 @@
+import { parseApiResponse } from "./apiResponse";
+
 const BASE_URL = import.meta.env.VITE_BACKEND_BASE_URI;
 
 const TRASH_ITEM_TYPES = {
   file: "file",
   directory: "directory",
 };
-
-async function handleFetchErrors(response, fallbackMessage) {
-  if (!response.ok) {
-    let errMsg =
-      fallbackMessage || `Request failed with status ${response.status}`;
-    try {
-      const data = await response.json();
-      if (data.error) errMsg = data.error;
-    } catch {
-      // Keep fallback error if response body is not JSON.
-    }
-    throw new Error(errMsg);
-  }
-
-  return response;
-}
 
 function getEndpointByType(type) {
   if (!TRASH_ITEM_TYPES[type]) {
@@ -34,8 +20,7 @@ export async function getTrashItems() {
     credentials: "include",
   });
 
-  await handleFetchErrors(response, "Failed to fetch trash items");
-  return response.json();
+  return parseApiResponse(response, "Failed to fetch trash items");
 }
 
 export async function restoreTrashItem(type, id) {
@@ -46,8 +31,7 @@ export async function restoreTrashItem(type, id) {
     credentials: "include",
   });
 
-  await handleFetchErrors(response, "Failed to restore item");
-  return response.json();
+  return parseApiResponse(response, "Failed to restore item");
 }
 
 export async function permanentlyDeleteTrashItem(type, id) {
@@ -58,8 +42,7 @@ export async function permanentlyDeleteTrashItem(type, id) {
     credentials: "include",
   });
 
-  await handleFetchErrors(response, "Failed to permanently delete item");
-  return response.json();
+  return parseApiResponse(response, "Failed to permanently delete item");
 }
 
 export async function emptyTrash() {
@@ -68,8 +51,7 @@ export async function emptyTrash() {
     credentials: "include",
   });
 
-  await handleFetchErrors(response, "Failed to empty trash");
-  return response.json();
+  return parseApiResponse(response, "Failed to empty trash");
 }
 
 export async function restoreFile(id) {
