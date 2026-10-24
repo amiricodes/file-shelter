@@ -27,7 +27,7 @@ finish() {
 }
 trap finish EXIT
 install -d -o ubuntu -g ubuntu -m 0750 /home/ubuntu/releases
-sudo -Hu ubuntu env GIT_TERMINAL_PROMPT=0 git clone --filter=blob:none --no-checkout --single-branch --branch main https://github.com/saaahilhussain/virtual-file-system.git "$RELEASE_DIR"
+sudo -Hu ubuntu env GIT_TERMINAL_PROMPT=0 git clone --filter=blob:none --no-checkout --single-branch --branch main https://github.com/saaahilhussain/file-shelter.git "$RELEASE_DIR"
 if [[ "$(sudo -Hu ubuntu git -C "$RELEASE_DIR" rev-parse origin/main)" != "$RELEASE_ID" ]]; then
   echo 'Refusing an outdated release. Start the backend workflow on current main.' >&2
   exit 1
