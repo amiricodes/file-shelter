@@ -17,7 +17,7 @@
   "pm2SavedStartup": "verified",
   "previousPm2Service": "disabled",
   "ubuntuDirectoryAccess": "read/write passed",
-  "gitRemote": "https://github.com/saaahilhussain/virtual-file-system.git",
+  "gitRemote": "https://github.com/saaahilhussain/file-shelter.git",
   "gitBranch": "main tracks origin/main",
   "gitPull": "ff-only succeeded",
   "apiHTTPS": 200,

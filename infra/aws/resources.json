@@ -105,7 +105,7 @@
     "certificateRenewal": "certbot.timer enabled",
     "appDirectory": "/home/ubuntu/file-shelter",
     "git": {
-      "remote": "https://github.com/saaahilhussain/virtual-file-system.git",
+      "remote": "https://github.com/saaahilhussain/file-shelter.git",
       "branch": "main",
       "pull": "fast-forward only",
       "pullVerification": "passed under ubuntu"

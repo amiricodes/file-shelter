@@ -80,8 +80,8 @@ serve the session APIs. Full application flows also require S3/CloudFront,
 Resend, OAuth and Razorpay configuration; automated tests use isolated doubles.
 
 ```bash
-git clone https://github.com/saaahilhussain/virtual-file-system.git
-cd virtual-file-system
+git clone https://github.com/saaahilhussain/file-shelter.git
+cd file-shelter
 npm ci --prefix server
 npm ci --prefix client
 ```
