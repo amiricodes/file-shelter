@@ -11,6 +11,12 @@ import {
   reconcileSizes,
   storageError,
 } from "../services/storageService.js";
+import {
+  buildCursorMatch,
+  decodeCursor,
+  encodeCursor,
+  InvalidCursorError,
+} from "../utils/paginationCursor.js";
 
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 100;
@@ -19,30 +25,6 @@ function rejectRootMutation(req, res) {
   if (String(req.params.id) !== String(req.user.rootDirId)) return false;
   res.status(400).json({ error: "The root directory cannot be modified." });
   return true;
-}
-
-function decodeCursor(cursor) {
-  if (!cursor) return null;
-
-  try {
-    const { updatedAt, id } = JSON.parse(
-      Buffer.from(cursor, "base64url").toString("utf8"),
-    );
-    const timestamp = new Date(updatedAt);
-    if (!id || Number.isNaN(timestamp.getTime()) || !ObjectId.isValid(id)) {
-      return null;
-    }
-    return { updatedAt: timestamp, id: new ObjectId(id) };
-  } catch {
-    return null;
-  }
-}
-
-function encodeCursor(item) {
-  if (!item?.updatedAt || !item?._id) return null;
-  return Buffer.from(
-    JSON.stringify({ updatedAt: item.updatedAt.toISOString(), id: item._id }),
-  ).toString("base64url");
 }
 
 async function buildLegacyPathIds(directoryData, userId) {
@@ -79,7 +61,15 @@ export const getDirectory = async (req, res) => {
     ),
     MAX_PAGE_SIZE,
   );
-  const cursor = decodeCursor(req.query.cursor);
+  let cursor;
+  try {
+    cursor = decodeCursor(req.query.cursor);
+  } catch (error) {
+    if (error instanceof InvalidCursorError) {
+      return res.status(error.status).json({ error: error.message });
+    }
+    throw error;
+  }
 
   const directoryData = await Directory.findOne({
     _id: id,
@@ -132,14 +122,7 @@ export const getDirectory = async (req, res) => {
     ...childMatch,
     uploadCompletedAt: { $ne: null },
   };
-  const cursorMatch = cursor
-    ? {
-        $or: [
-          { updatedAt: { $lt: cursor.updatedAt } },
-          { updatedAt: cursor.updatedAt, _id: { $lt: cursor.id } },
-        ],
-      }
-    : {};
+  const cursorMatch = buildCursorMatch(cursor);
 
   const page = await File.aggregate([
     { $match: { ...fileMatch, ...cursorMatch } },

@@ -81,6 +81,35 @@ async function createDirectory({ name, parent, account, size = 0 }) {
   });
 }
 
+async function createEqualTimestampDirectories({ account, parent = null }) {
+  const lowerId = new Types.ObjectId("64b000000000000000000001");
+  const higherId = new Types.ObjectId("64b000000000000000000002");
+  const updatedAt = new Date("2026-10-24T12:34:56.789Z");
+  const parentDirId = parent?._id || account.rootDirId;
+  const parentPath = parent?.path || [account.rootDirId];
+
+  await Directory.create([
+    {
+      _id: lowerId,
+      name: "lower-id",
+      parentDirId,
+      path: [...parentPath, lowerId],
+      userId: account.user._id,
+      updatedAt,
+    },
+    {
+      _id: higherId,
+      name: "higher-id",
+      parentDirId,
+      path: [...parentPath, higherId],
+      userId: account.user._id,
+      updatedAt,
+    },
+  ]);
+
+  return { lowerId, higherId };
+}
+
 beforeAll(async () => {
   replicaSet = await MongoMemoryReplSet.create({
     replSet: { count: 1, storageEngine: "wiredTiger" },
@@ -596,6 +625,90 @@ describe("durable storage maintenance", () => {
     expect((await Directory.findById(child._id)).size).toBe(80);
     expect((await Directory.findById(account.rootDirId)).size).toBe(80);
     expect(await reconcileAccountStorage(account.user._id)).toBe(0);
+  });
+});
+
+describe("directory pagination", () => {
+  it("paginates authenticated listings by ObjectId and rejects malformed cursors", async () => {
+    const account = await createAccount();
+    const { lowerId, higherId } = await createEqualTimestampDirectories({
+      account,
+    });
+
+    const firstPage = await request(app)
+      .get(`/directory/${account.rootDirId}`)
+      .query({ limit: 1 })
+      .set("Cookie", account.cookie);
+
+    expect(firstPage.status).toBe(200);
+    expect(firstPage.body.items.map((item) => item.id)).toEqual([
+      higherId.toString(),
+    ]);
+    expect(firstPage.body.nextCursor).toEqual(expect.any(String));
+
+    const secondPage = await request(app)
+      .get(`/directory/${account.rootDirId}`)
+      .query({ limit: 1, cursor: firstPage.body.nextCursor })
+      .set("Cookie", account.cookie);
+
+    expect(secondPage.status).toBe(200);
+    expect(secondPage.body.items.map((item) => item.id)).toEqual([
+      lowerId.toString(),
+    ]);
+    expect(secondPage.body.nextCursor).toBeNull();
+
+    const malformed = await request(app)
+      .get(`/directory/${account.rootDirId}`)
+      .query({ cursor: "not+a+base64url+cursor" })
+      .set("Cookie", account.cookie);
+
+    expect(malformed.status).toBe(400);
+    expect(malformed.body).toEqual({ error: "Invalid pagination cursor." });
+  });
+
+  it("paginates public shared folders and rejects malformed cursors", async () => {
+    const account = await createAccount();
+    const sharedRoot = await createDirectory({
+      name: "shared",
+      parent: null,
+      account,
+    });
+    const { lowerId, higherId } = await createEqualTimestampDirectories({
+      account,
+      parent: sharedRoot,
+    });
+    const created = await request(app)
+      .post("/share")
+      .set("Cookie", account.cookie)
+      .send({ resourceType: "directory", resourceId: sharedRoot._id });
+    const token = created.body.share.token;
+
+    const firstPage = await request(app)
+      .get(`/public/share/${token}`)
+      .query({ limit: 1 });
+
+    expect(firstPage.status).toBe(200);
+    expect(firstPage.body.items.map((item) => item.id)).toEqual([
+      higherId.toString(),
+    ]);
+    expect(firstPage.body.nextCursor).toEqual(expect.any(String));
+
+    const secondPage = await request(app)
+      .get(`/public/share/${token}`)
+      .query({ limit: 1, cursor: firstPage.body.nextCursor });
+
+    expect(secondPage.status).toBe(200);
+    expect(secondPage.body.items.map((item) => item.id)).toEqual([
+      lowerId.toString(),
+    ]);
+    expect(secondPage.body.nextCursor).toBeNull();
+
+    const malformed = await request(app)
+      .get(`/public/share/${token}`)
+      .query({ cursor: "not+a+base64url+cursor" });
+
+    expect(malformed.status).toBe(400);
+    expect(malformed.body).toEqual({ error: "Invalid pagination cursor." });
   });
 });
 
