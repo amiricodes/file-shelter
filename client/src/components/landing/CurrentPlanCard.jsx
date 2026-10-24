@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   cancelSubscription,
   getMySubscription,
@@ -98,7 +98,7 @@ const CurrentPlanCard = ({ onChange }) => {
   const [confirm, setConfirm] = useState(null); // "pause" | "resume" | "cancel" | null
   const [errorMsg, setErrorMsg] = useState("");
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const data = await getMySubscription();
@@ -123,11 +123,11 @@ const CurrentPlanCard = ({ onChange }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [onChange]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const status = subscription?.status;
   const statusLabel = (status && STATUS_COPY[status]) || status || "";

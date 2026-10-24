@@ -13,7 +13,9 @@ function CreateDirectoryModal({
       inputRef.current.focus();
       inputRef.current.select();
     }
+  }, []);
 
+  useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
         onClose();
@@ -24,7 +26,7 @@ function CreateDirectoryModal({
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, []);
+  }, [onClose]);
 
   const handleContentClick = (e) => {
     e.stopPropagation();

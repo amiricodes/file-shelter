@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Sidebar from "../components/Sidebar";
 import TopBar from "../components/TopBar";
@@ -75,14 +75,6 @@ function DirectoryView() {
 
   // Uploading states
   const fileInputRef = useRef(null);
-  const { upload, start: startUpload, retryCompletion, cancel: handleCancelUpload, dismiss } = useFileUpload({
-    onSettled: () => {
-      getDirectoryItemsHandler();
-      getUserStorageInfo();
-    },
-    onUnauthorized: () => navigate("/login"),
-  });
-  const isUploading = Boolean(upload);
 
   // Context menu
   const [activeContextMenu, setActiveContextMenu] = useState(null);
@@ -94,11 +86,11 @@ function DirectoryView() {
   /**
    * Fetch directory contents
    */
-  async function getDirectoryItemsHandler({
+  const getDirectoryItemsHandler = useCallback(async ({
     cursor = null,
     append = false,
     signal,
-  } = {}) {
+  } = {}) => {
     setErrorMessage(""); // clear any existing error
     if (append) setLoadingMore(true);
     else setDirectoryLoading(true);
@@ -129,9 +121,9 @@ function DirectoryView() {
         setLoadingMore(false);
       }
     }
-  }
+  }, [dirId, navigate]);
 
-  async function getUserStorageInfo() {
+  const getUserStorageInfo = useCallback(async () => {
     setStorageLoading(true);
     try {
       const user = await fetchUser();
@@ -148,7 +140,22 @@ function DirectoryView() {
     } finally {
       setStorageLoading(false);
     }
-  }
+  }, [navigate]);
+
+  const {
+    upload,
+    start: startUpload,
+    retryCompletion,
+    cancel: handleCancelUpload,
+    dismiss,
+  } = useFileUpload({
+    onSettled: () => {
+      getDirectoryItemsHandler();
+      getUserStorageInfo();
+    },
+    onUnauthorized: () => navigate("/login"),
+  });
+  const isUploading = Boolean(upload);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -161,43 +168,7 @@ function DirectoryView() {
     // Reset context menu
     setActiveContextMenu(null);
     return () => controller.abort();
-  }, [dirId]);
-
-  /**
-   * Decide file icon
-   */
-  function getFileIcon(filename) {
-    const ext = filename.split(".").pop().toLowerCase();
-    switch (ext) {
-      case "pdf":
-        return "pdf";
-      case "png":
-      case "jpg":
-      case "jpeg":
-      case "gif":
-        return "image";
-      case "mp4":
-      case "mov":
-      case "avi":
-        return "video";
-      case "zip":
-      case "rar":
-      case "tar":
-      case "gz":
-        return "archive";
-      case "js":
-      case "jsx":
-      case "ts":
-      case "tsx":
-      case "html":
-      case "css":
-      case "py":
-      case "java":
-        return "code";
-      default:
-        return "alt";
-    }
-  }
+  }, [dirId, getDirectoryItemsHandler, getUserStorageInfo]);
 
   /**
    * Click row to open directory or file
@@ -489,7 +460,6 @@ function DirectoryView() {
               activeContextMenu={activeContextMenu}
               contextMenuPos={contextMenuPos}
               handleContextMenu={handleContextMenu}
-              getFileIcon={getFileIcon}
               isUploading={isUploading}
               progressMap={{}}
               handleCancelUpload={handleCancelUpload}

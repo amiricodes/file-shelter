@@ -6,7 +6,7 @@ async function handleFetchErrors(response) {
     try {
       const data = await response.json();
       if (data.error) errMsg = data.error;
-    } catch (_) {
+    } catch {
       // If JSON parsing fails, default errMsg stays
     }
     throw new Error(errMsg);
@@ -90,7 +90,7 @@ export async function getSharedItem(token, { dir, cursor, limit } = {}) {
       const data = await response.json();
       if (data.error) errMsg = data.error;
       if (data.code) code = data.code;
-    } catch (_) {
+    } catch {
       // If JSON parsing fails, defaults stay
     }
     const error = new Error(errMsg);

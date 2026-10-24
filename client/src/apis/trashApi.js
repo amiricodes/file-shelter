@@ -12,7 +12,7 @@ async function handleFetchErrors(response, fallbackMessage) {
     try {
       const data = await response.json();
       if (data.error) errMsg = data.error;
-    } catch (_) {
+    } catch {
       // Keep fallback error if response body is not JSON.
     }
     throw new Error(errMsg);

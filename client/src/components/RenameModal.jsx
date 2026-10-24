@@ -8,19 +8,22 @@ function RenameModal({
   onRenameSubmit,
 }) {
   const inputRef = useRef(null);
+  const initialRenameValue = useRef(renameValue);
 
   useEffect(() => {
     if (inputRef.current) {
       inputRef.current.focus();
 
-      const dotIndex = renameValue.lastIndexOf(".");
+      const dotIndex = initialRenameValue.current.lastIndexOf(".");
       if (dotIndex > 0) {
         inputRef.current.setSelectionRange(0, dotIndex);
       } else {
         inputRef.current.select();
       }
     }
+  }, []);
 
+  useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === "Escape") {
         onClose();
@@ -31,7 +34,7 @@ function RenameModal({
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, []);
+  }, [onClose]);
 
   const handleContentClick = (e) => {
     e.stopPropagation();
