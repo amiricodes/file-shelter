@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
 import PricingSection from "../components/landing/PricingSection";
 import CurrentPlanCard from "../components/landing/CurrentPlanCard";
@@ -7,13 +7,13 @@ const Plans = () => {
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  const handleSubscriptionChange = (subscription) => {
+  const handleSubscriptionChange = useCallback((subscription) => {
     setCurrentSubscription(subscription);
-  };
+  }, []);
 
-  const handleSwitched = () => {
+  const handleSwitched = useCallback(() => {
     setReloadKey((k) => k + 1);
-  };
+  }, []);
 
   return (
     <div

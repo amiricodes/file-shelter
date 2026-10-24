@@ -1,5 +1,3 @@
-import React from "react";
-
 function DetailsModal({ item, onClose }) {
   if (!item) return null;
 

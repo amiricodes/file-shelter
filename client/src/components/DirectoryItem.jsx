@@ -6,7 +6,6 @@ function DirectoryItem({
   activeContextMenu,
   contextMenuPos,
   handleContextMenu,
-  getFileIcon,
   isUploading,
   uploadProgress,
   handleCancelUpload,

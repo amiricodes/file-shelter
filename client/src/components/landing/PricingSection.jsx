@@ -71,7 +71,7 @@ function openRazorpayPopup({ subscriptionId }) {
     description: "Storage subscription payment",
     name: "File Shelter",
     subscription_id: subscriptionId,
-    handler: async function (response) {
+    handler: function () {
       window.location.href = "/app";
     },
   });

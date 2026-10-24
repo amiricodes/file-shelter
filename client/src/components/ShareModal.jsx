@@ -70,14 +70,14 @@ function ShareModal({ item, onClose }) {
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [onClose]);
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(shareLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (_) {
+    } catch {
       window.prompt("Copy this link:", shareLink);
     }
   };

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Sidebar from "../components/Sidebar";
 import TopBar from "../components/TopBar";
 import { useNavigate } from "react-router-dom";
@@ -28,12 +28,7 @@ function UsersView() {
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    handleFetchAllUsers();
-    handleFetchUser();
-  }, []);
-
-  async function handleFetchAllUsers() {
+  const handleFetchAllUsers = useCallback(async () => {
     try {
       const data = await fetchAllUsers();
       setUsers(data);
@@ -44,9 +39,9 @@ function UsersView() {
         console.log("Error finding users:", error.message);
       }
     }
-  }
+  }, [navigate]);
 
-  async function handleFetchUser() {
+  const handleFetchUser = useCallback(async () => {
     try {
       const data = await fetchUser();
       setUserName(data.name);
@@ -58,7 +53,12 @@ function UsersView() {
         console.error("Error fetching user info:", error.message);
       }
     }
-  }
+  }, [navigate]);
+
+  useEffect(() => {
+    handleFetchAllUsers();
+    handleFetchUser();
+  }, [handleFetchAllUsers, handleFetchUser]);
 
   const handleEditClick = (e, user) => {
     e.stopPropagation();

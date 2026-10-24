@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types -- This project uses plain JavaScript props. */
 export default function UploadStatus({ upload, onRetry, onCancel, onDismiss }) {
   if (!upload) return null;
   const labels = {

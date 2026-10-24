@@ -11,7 +11,7 @@ async function handleFetchErrors(response) {
       const data = await response.json();
       if (data.error) errMsg = data.error;
       if (data.code) code = data.code;
-    } catch (_) {
+    } catch {
       // If JSON parsing fails, default errMsg stays
     }
     const err = new Error(errMsg);

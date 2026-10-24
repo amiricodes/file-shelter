@@ -1,5 +1,3 @@
-import React from "react";
-
 export const GithubLogin = ({ onSuccess, onError }) => {
   const handleClick = () => {
     const clientId = import.meta.env.VITE_GITHUB_CLIENT_ID;
@@ -18,6 +16,11 @@ export const GithubLogin = ({ onSuccess, onError }) => {
       "GitHub Login",
       `width=${width},height=${height},top=${top},left=${left}`,
     );
+
+    if (!popup) {
+      onError?.(new Error("GitHub login popup was blocked."));
+      return;
+    }
 
     const handleMessage = async (event) => {
       if (event.origin !== window.location.origin) return;

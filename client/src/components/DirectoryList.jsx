@@ -6,7 +6,6 @@ function DirectoryList({
   activeContextMenu,
   contextMenuPos,
   handleContextMenu,
-  getFileIcon,
   isUploading,
   progressMap,
   handleCancelUpload,
@@ -37,7 +36,6 @@ function DirectoryList({
               activeContextMenu={activeContextMenu}
               contextMenuPos={contextMenuPos}
               handleContextMenu={handleContextMenu}
-              getFileIcon={getFileIcon}
               isUploading={isUploading}
               uploadProgress={uploadProgress}
               handleCancelUpload={handleCancelUpload}
