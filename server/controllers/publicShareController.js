@@ -4,33 +4,15 @@ import File from "../models/fileModel.js";
 import Share from "../models/shareModel.js";
 import User from "../models/userModel.js";
 import { createCloudFrontGetUrl } from "../services/cloudFrontService.js";
+import {
+  buildCursorMatch,
+  decodeCursor,
+  encodeCursor,
+  InvalidCursorError,
+} from "../utils/paginationCursor.js";
 
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 100;
-
-function decodeCursor(cursor) {
-  if (!cursor) return null;
-
-  try {
-    const { updatedAt, id } = JSON.parse(
-      Buffer.from(cursor, "base64url").toString("utf8"),
-    );
-    const timestamp = new Date(updatedAt);
-    if (!id || Number.isNaN(timestamp.getTime()) || !ObjectId.isValid(id)) {
-      return null;
-    }
-    return { updatedAt: timestamp, id: new ObjectId(id) };
-  } catch {
-    return null;
-  }
-}
-
-function encodeCursor(item) {
-  if (!item?.updatedAt || !item?._id) return null;
-  return Buffer.from(
-    JSON.stringify({ updatedAt: item.updatedAt.toISOString(), id: item._id }),
-  ).toString("base64url");
-}
 
 async function resolveActiveShare(token) {
   const share = await Share.findOne({ token, isActive: true }).lean();
@@ -84,9 +66,13 @@ async function assertShareAccess(req, share) {
   ).lean();
   if (!user || user.isDeleted) return signInRequired;
 
-  const email = String(user.email || "").trim().toLowerCase();
+  const email = String(user.email || "")
+    .trim()
+    .toLowerCase();
   const allowed = (share.allowedEmails || []).map((value) =>
-    String(value || "").trim().toLowerCase(),
+    String(value || "")
+      .trim()
+      .toLowerCase(),
   );
   if (!allowed.includes(email)) {
     return {
@@ -280,7 +266,15 @@ export const getSharedItem = async (req, res, next) => {
       ),
       MAX_PAGE_SIZE,
     );
-    const cursor = decodeCursor(req.query.cursor);
+    let cursor;
+    try {
+      cursor = decodeCursor(req.query.cursor);
+    } catch (error) {
+      if (error instanceof InvalidCursorError) {
+        return res.status(error.status).json({ error: error.message });
+      }
+      throw error;
+    }
 
     const childMatch = {
       parentDirId: currentDir._id,
@@ -294,14 +288,7 @@ export const getSharedItem = async (req, res, next) => {
       uploadCompletedAt: { $ne: null },
     };
 
-    const cursorMatch = cursor
-      ? {
-          $or: [
-            { updatedAt: { $lt: cursor.updatedAt } },
-            { updatedAt: cursor.updatedAt, _id: { $lt: cursor.id } },
-          ],
-        }
-      : {};
+    const cursorMatch = buildCursorMatch(cursor);
 
     const page = await File.aggregate([
       { $match: { ...fileMatch, ...cursorMatch } },
