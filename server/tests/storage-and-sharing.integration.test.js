@@ -781,7 +781,9 @@ describe("directory pagination", () => {
       .set("Cookie", account.cookie);
 
     expect(malformed.status).toBe(400);
-    expect(malformed.body).toEqual({ error: "Invalid pagination cursor." });
+    expect(malformed.body).toEqual({
+      error: { cursor: ["Invalid pagination cursor"] },
+    });
   });
 
   it("paginates public shared folders and rejects malformed cursors", async () => {
