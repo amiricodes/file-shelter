@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DirectoryView from "../pages/DirectoryView";
 import useFileUpload from "../hooks/useFileUpload";
+import { UPLOAD_RECOVERY_KEY, UPLOAD_RECOVERY_MAX_AGE_MS } from "../hooks/uploadRecovery";
 
 // Exercise the real page, API functions and upload UI. Only network boundaries
 // are replaced; an S3 transfer and an API acknowledgement are separate events.
@@ -35,6 +36,7 @@ let completed;
 let fetchMock;
 
 beforeEach(() => {
+  sessionStorage.clear();
   UploadRequest.instances = [];
   completed = false;
   completeResponse = () => { completed = true; return json({ message: "Upload Complete" }); };
@@ -44,7 +46,7 @@ beforeEach(() => {
   fetchMock = vi.fn(async (url, options) => {
     const path = new URL(url).pathname;
     expect(options.credentials).toBe("include");
-    if (path === "/user") return json({ name: "Reviewer", role: "user", usedStorage: completed ? 5 : 0, maxStorage: 100 });
+    if (path === "/user") return json({ name: "Reviewer", email: "reviewer@example.test", role: "user", usedStorage: completed ? 5 : 0, maxStorage: 100 });
     if (path.startsWith("/directory/")) return directoryResponse(url);
     if (path === "/file/upload/initiate") return initiateResponse();
     if (path === "/file/upload/complete") return completeResponse();
@@ -55,9 +57,8 @@ beforeEach(() => {
   vi.stubGlobal("XMLHttpRequest", UploadRequest);
 });
 
-async function openDrive() {
-  const user = userEvent.setup();
-  render(
+function renderDrive() {
+  return render(
     <MemoryRouter initialEntries={["/app"]}>
       <Routes>
         <Route path="/app" element={<DirectoryView />} />
@@ -65,8 +66,24 @@ async function openDrive() {
       </Routes>
     </MemoryRouter>,
   );
+}
+
+async function openDrive() {
+  const user = userEvent.setup();
+  renderDrive();
   await screen.findByText(/This folder is empty/);
   return user;
+}
+
+function storeRecovery(overrides = {}) {
+  sessionStorage.setItem(UPLOAD_RECOVERY_KEY, JSON.stringify({
+    version: 1,
+    owner: "reviewer@example.test",
+    fileId: "file-1",
+    name: "report.txt",
+    createdAt: Date.now(),
+    ...overrides,
+  }));
 }
 
 async function selectFile(user) {
@@ -81,7 +98,7 @@ describe("drive critical flows", () => {
   it("refreshes the current folder callback if navigation occurs during a transfer", async () => {
     const previousFolder = vi.fn();
     const currentFolder = vi.fn();
-    const { result, rerender } = renderHook(({ onSettled }) => useFileUpload({ onSettled, onUnauthorized: vi.fn() }), {
+    const { result, rerender } = renderHook(({ onSettled }) => useFileUpload({ accountId: "reviewer@example.test", onSettled, onUnauthorized: vi.fn() }), {
       initialProps: { onSettled: previousFolder },
     });
     let uploadPromise;
@@ -91,6 +108,58 @@ describe("drive critical flows", () => {
     await act(async () => { UploadRequest.instances[0].finish(); await uploadPromise; });
     expect(previousFolder).not.toHaveBeenCalled();
     expect(currentFolder).toHaveBeenCalledTimes(1);
+  });
+
+  it("recovers completion after reload without initiating or transferring again", async () => {
+    storeRecovery();
+    const user = await openDrive();
+    expect(await screen.findByText(/Upload was interrupted/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Retry completion" }));
+
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Upload status" })).not.toBeInTheDocument());
+    expect(requestsFor("/file/upload/initiate")).toHaveLength(0);
+    expect(requestsFor("/file/upload/complete")[0][1].body).toBe(JSON.stringify({ fileId: "file-1" }));
+    expect(UploadRequest.instances).toHaveLength(0);
+    expect(sessionStorage.getItem(UPLOAD_RECOVERY_KEY)).toBeNull();
+  });
+
+  it("offers cancellation after a reload interrupts the transfer", async () => {
+    const user = userEvent.setup();
+    const firstView = renderDrive();
+    await screen.findByText(/This folder is empty/);
+    const xhr = await selectFile(user);
+
+    const recovery = JSON.parse(sessionStorage.getItem(UPLOAD_RECOVERY_KEY));
+    expect(recovery).toMatchObject({ owner: "reviewer@example.test", fileId: "file-1", name: "report.txt" });
+    expect(recovery).not.toHaveProperty("uploadUrl");
+    expect(recovery).not.toHaveProperty("file");
+
+    firstView.unmount();
+    expect(xhr.abort).toHaveBeenCalledTimes(1);
+    renderDrive();
+    await screen.findByText(/Upload was interrupted/);
+    await user.click(screen.getByRole("button", { name: "Cancel upload" }));
+
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Upload status" })).not.toBeInTheDocument());
+    expect(requestsFor("/file/upload/initiate")).toHaveLength(1);
+    expect(UploadRequest.instances).toHaveLength(1);
+    expect(requestsFor("/file/upload/cancel")[0][1].body).toBe(JSON.stringify({ fileId: "file-1" }));
+    expect(sessionStorage.getItem(UPLOAD_RECOVERY_KEY)).toBeNull();
+  });
+
+  it.each([
+    ["malformed", "{not-json"],
+    ["stale", JSON.stringify({ version: 1, owner: "reviewer@example.test", fileId: "file-1", name: "report.txt", createdAt: Date.now() - UPLOAD_RECOVERY_MAX_AGE_MS })],
+    ["another account", JSON.stringify({ version: 1, owner: "someone-else@example.test", fileId: "private-file", name: "private.txt", createdAt: Date.now() })],
+  ])("discards %s recovery state safely", async (_label, value) => {
+    sessionStorage.setItem(UPLOAD_RECOVERY_KEY, value);
+    await openDrive();
+
+    expect(screen.queryByRole("region", { name: "Upload status" })).not.toBeInTheDocument();
+    expect(sessionStorage.getItem(UPLOAD_RECOVERY_KEY)).toBeNull();
+    expect(requestsFor("/file/upload/complete")).toHaveLength(0);
+    expect(requestsFor("/file/upload/cancel")).toHaveLength(0);
   });
 
   it("transfers bytes, confirms completion, then refreshes the file listing and storage", async () => {
@@ -234,6 +303,7 @@ describe("drive critical flows", () => {
     act(() => xhr.finish());
     await screen.findByRole("button", { name: "Dismiss" });
     expect(screen.queryByRole("button", { name: "Retry completion" })).not.toBeInTheDocument();
+    expect(sessionStorage.getItem(UPLOAD_RECOVERY_KEY)).toBeNull();
   });
 
   it("redirects an expired upload session to login", async () => {

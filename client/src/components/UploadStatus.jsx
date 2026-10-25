@@ -9,8 +9,10 @@ export default function UploadStatus({ upload, onRetry, onCancel, onDismiss }) {
     "transfer-error": "Transfer failed.",
     "cancel-error": "Cancellation failed. Your upload reservation is still pending.",
     "terminal-error": "Upload failed.",
+    recovery: "Upload was interrupted. Retry completion if the transfer finished, or cancel the reservation.",
   };
-  const canCancel = ["uploading", "completion-error", "transfer-error", "cancel-error"].includes(upload.status);
+  const canRetry = ["completion-error", "recovery"].includes(upload.status);
+  const canCancel = ["uploading", "completion-error", "transfer-error", "cancel-error", "recovery"].includes(upload.status);
   return (
     <section className="upload-status" aria-label="Upload status" aria-live="polite">
       <strong>{upload.name}</strong>
@@ -20,7 +22,7 @@ export default function UploadStatus({ upload, onRetry, onCancel, onDismiss }) {
       )}
       {upload.error && <p role="alert">{upload.error}</p>}
       <div className="upload-status-actions">
-        {upload.status === "completion-error" && (
+        {canRetry && (
           <button className="profile-secondary-btn" onClick={onRetry}>Retry completion</button>
         )}
         {canCancel && <button className="profile-secondary-btn" onClick={onCancel}>Cancel upload</button>}

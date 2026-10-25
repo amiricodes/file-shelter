@@ -1,9 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { uploadInitiate, uploadComplete, uploadCancel } from "../apis/fileApi";
+import {
+  clearRecoveryRecord,
+  normalizeUploadOwner,
+  persistRecoveryRecord,
+  readRecoveryRecord,
+} from "./uploadRecovery";
 
 // A pending attempt keeps its server reservation until completion or acknowledged
 // cancellation. In particular, retrying completion must never initiate a new PUT.
-export default function useFileUpload({ onSettled, onUnauthorized }) {
+export default function useFileUpload({ accountId, onSettled, onUnauthorized }) {
   const [upload, setUpload] = useState(null);
   const attemptRef = useRef(null);
   const mounted = useRef(true);
@@ -17,6 +23,34 @@ export default function useFileUpload({ onSettled, onUnauthorized }) {
       attemptRef.current?.xhr?.abort();
     };
   }, []);
+
+  useEffect(() => {
+    const owner = normalizeUploadOwner(accountId);
+    if (!owner) return;
+
+    const current = attemptRef.current;
+    if (current) {
+      if (current.owner === owner) return;
+      current.cancelled = true;
+      current.xhr?.abort();
+      attemptRef.current = null;
+      setUpload(null);
+    }
+
+    const recovery = readRecoveryRecord(owner);
+    if (!recovery) return;
+
+    attemptRef.current = {
+      busy: false,
+      cancelled: false,
+      fileId: recovery.fileId,
+      name: recovery.name,
+      owner,
+      createdAt: recovery.createdAt,
+      putSucceeded: true,
+    };
+    setUpload({ name: recovery.name, status: "recovery", progress: 0, error: "" });
+  }, [accountId]);
 
   function update(attempt, values) {
     if (mounted.current && attemptRef.current === attempt) {
@@ -39,9 +73,13 @@ export default function useFileUpload({ onSettled, onUnauthorized }) {
       // These responses mean the reservation is gone or the file is invalid.
       const terminal = [400, 404, 410].includes(error.status);
       fail(attempt, error, terminal ? "terminal-error" : "completion-error");
-      if (terminal) attempt.fileId = null;
+      if (terminal) {
+        clearRecoveryRecord(attempt);
+        attempt.fileId = null;
+      }
       return;
     }
+    clearRecoveryRecord(attempt);
     if (!mounted.current || attemptRef.current !== attempt) return;
     attemptRef.current = null;
     setUpload(null);
@@ -51,7 +89,23 @@ export default function useFileUpload({ onSettled, onUnauthorized }) {
   async function start(file, parentDirId) {
     // Set the lock before initiation, including the period before React renders.
     if (attemptRef.current) return;
-    const attempt = { busy: true, cancelled: false };
+    const owner = normalizeUploadOwner(accountId);
+    if (!owner) {
+      setUpload({
+        name: file.name,
+        status: "terminal-error",
+        progress: 0,
+        error: "Account details are still loading. Please try again.",
+      });
+      return;
+    }
+    const attempt = {
+      busy: true,
+      cancelled: false,
+      name: file.name,
+      owner,
+      createdAt: Date.now(),
+    };
     attemptRef.current = attempt;
     setUpload({ name: file.name, status: "initiating", progress: 0, error: "" });
     let data;
@@ -64,6 +118,7 @@ export default function useFileUpload({ onSettled, onUnauthorized }) {
       return;
     }
     attempt.fileId = data.fileId;
+    persistRecoveryRecord(attempt);
     if (!mounted.current) return;
     attempt.busy = false;
     update(attempt, { status: "uploading" });
@@ -116,6 +171,7 @@ export default function useFileUpload({ onSettled, onUnauthorized }) {
       fail(attempt, error, attempt.putSucceeded ? "completion-error" : "cancel-error");
       return;
     }
+    clearRecoveryRecord(attempt);
     if (!mounted.current || attemptRef.current !== attempt) return;
     attemptRef.current = null;
     setUpload(null);

@@ -58,6 +58,7 @@ function DirectoryView() {
 
   // User + storage state for sidebar
   const [sidebarUser, setSidebarUser] = useState({
+    accountId: null,
     role: null,
     usedStorage: 0,
     maxStorage: 0,
@@ -128,6 +129,7 @@ function DirectoryView() {
     try {
       const user = await fetchUser();
       setSidebarUser({
+        accountId: user.email || null,
         role: user.role || null,
         usedStorage: Number(user.usedStorage) || 0,
         maxStorage: Number(user.maxStorage) || 0,
@@ -149,6 +151,7 @@ function DirectoryView() {
     cancel: handleCancelUpload,
     dismiss,
   } = useFileUpload({
+    accountId: sidebarUser.accountId,
     onSettled: () => {
       getDirectoryItemsHandler();
       getUserStorageInfo();
